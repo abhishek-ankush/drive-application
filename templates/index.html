@@ -1,0 +1,182 @@
+{% extends 'bootstrap/base.html' %}
+
+{% block title %}File Management{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">File Management</h1>
+    <form id="search_form" action="{{ url_for('search') }}" method="POST" class="mb-4" onsubmit="return false;">
+    <div class="form-group">
+            <label for="query">Search:</label>
+            <div class="input-group">
+                <input type="text" class="form-control" id="query" name="query" required>
+                <div class="input-group-append">
+                    <button type="submit" class="btn btn-primary">Search</button>
+                </div>
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="search_option">Search Option:</label>
+            <select class="form-control" id="search_option" name="search_option" onchange="if(this.value==='date'){ document.getElementById('query').style.display='none'; document.getElementById('datePickerContainer').style.display='block'; }else{ document.getElementById('query').style.display='block'; document.getElementById('datePickerContainer').style.display='none'; }">
+                <option value="name">Search by Name</option>
+                <option value="date">Search by Date</option>
+            </select>
+            
+        </div>
+        <div class="form-group" id="datePickerContainer" style="display: none;">
+            <label for="datepicker">Select Date:</label>
+            <input type="text" class="form-control" id="datepicker" name="query_date">
+        </div>
+        
+    </form>
+
+    {% if update_dates %}
+    <datalist id="suggestions">
+        {% for date in update_dates %}
+        <option value="{{ date }}">{{ date }}</option>
+        {% endfor %}
+    </datalist>
+    {% endif %}
+    
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    Files
+                    <a href="{{ url_for('upload') }}" class="btn btn-success float-right">Upload File</a>
+                </div>
+                <h2>Folder Upload</h2>
+                <a href="{{ url_for('upload_folder') }}" class="btn btn-primary">Upload Folder</a>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>File Name</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for file in files %}
+                                <tr>
+                                    <td>{{ loop.index }}</td>
+                                    <td>{{ file }}</td>
+                                    <td>
+                                        <a href="{{ url_for('view', filename=file) }}" class="btn btn-primary btn-sm">View</a>
+                                        <a href="{{ url_for('download', filename=file) }}" class="btn btn-success btn-sm">Download</a>
+                                        <!-- <a href="{{ url_for('delete', filename=file) }}" class="btn btn-danger btn-sm">Delete</a> -->
+                                    </td>
+                                </tr>
+
+                                {% endfor %}
+                                {% if not files %}
+                                <tr>
+                                    <td colspan="3">No files found.</td>
+                                </tr>
+                                {% endif %}
+                                
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h2>Folders</h2>
+                        <ul>
+                            {% for folder in folders %}
+                            <li><a href="{{ url_for('folder_details', folder_id=folder.id) }}" target="_blank">{{ folder.name }}</a></li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <a href="{{ url_for('index') }}" class="btn btn-secondary">Home</a>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<!-- Include Bootstrap Datepicker CSS and JavaScript files -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/css/bootstrap-datepicker.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/js/bootstrap-datepicker.min.js"></script>
+
+<script>
+    // Show or hide the search field based on the selected option
+    const searchOption = document.querySelector('#search_option');
+    const searchForm = document.querySelector('#search_form');
+    const searchField = document.querySelector('#query');
+    const datePickerContainer = document.querySelector('#datePickerContainer');
+
+    searchOption.addEventListener('change', function() {
+        if (this.value === 'date') {
+            searchField.style.display = 'none';
+            datePickerContainer.style.display = 'block';
+        } else {
+            searchField.style.display = 'block';
+            datePickerContainer.style.display = 'none';
+        }
+    });
+
+    // Initialize the date picker
+    const datepicker = document.querySelector('#datepicker');
+    if (datepicker) {
+        $(datepicker).datepicker({
+            format: 'yyyy-mm-dd',
+            autoclose: true,
+            orientation: 'bottom',
+            todayHighlight: true
+        });
+    }
+
+    // Handle form submission
+// Handle form submission
+// Handle form submission
+searchForm.addEventListener('submit', function(event) {
+    event.preventDefault();  // Prevent the default form submission behavior
+
+    const formData = new FormData(searchForm);
+    const xhr = new XMLHttpRequest();
+
+    xhr.onload = function() {
+        if (xhr.status === 200) {
+            // Successful response
+            const response = JSON.parse(xhr.responseText);
+            console.log('Search Results:', response.files);
+
+            // Clear the existing table rows
+            const tableBody = document.querySelector('tbody');
+            tableBody.innerHTML = '';
+
+            // Iterate over the files and add them to the table
+            response.files.forEach(function(file, index) {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${file.filename}</td>
+                    <td>
+                        <a href="/view/${file.filename}" class="btn btn-primary btn-sm">View</a>
+                        <a href="/download/${file.filename}" class="btn btn-success btn-sm">Download</a>
+                        
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        } else {
+            // Error in response
+            console.log('Search request failed. Status:', xhr.status);
+        }
+    };
+
+    xhr.open('POST', searchForm.action);
+    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+    xhr.send(formData);
+});
+
+
+</script>
+{% endblock %}

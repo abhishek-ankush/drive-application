@@ -1,0 +1,35 @@
+{% extends 'bootstrap/base.html' %}
+
+{% block title %}Upload{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Upload Files</h1>
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        <div class="alert alert-danger">
+            <ul class="mb-0">
+                {% for message in messages %}
+                <li>{{ message }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    {% endwith %}
+    <form action="{{ url_for('upload') }}" method="POST" enctype="multipart/form-data" onsubmit="return redirectToMainPage()">
+    <div class="form-group">
+            <label for="files">Select Files:</label>
+            <input type="file" class="form-control-file" id="files" name="files" multiple required>
+        </div>
+        <button type="submit" class="btn btn-primary">Upload</button>
+        <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% block scripts %}
+<script>
+    function redirectToMainPage() {
+        window.location.href = "{{ url_for('index') }}";
+        return true;
+    }
+</script>
+{% endblock %}

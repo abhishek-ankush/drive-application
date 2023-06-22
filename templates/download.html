@@ -1,0 +1,11 @@
+{% extends 'bootstrap/base.html' %}
+
+{% block title %}Download File{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Download File - {{ filename }}</h1>
+    <a href="{{ url_for('download', filename=filename) }}" class="btn btn-primary">Download</a>
+    <a href="{{ url_for('index') }}" class="btn btn-secondary">Back</a>
+</div>
+{% endblock %}
