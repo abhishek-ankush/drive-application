@@ -28,9 +28,9 @@ class File(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     filename = db.Column(db.String(128), nullable=False)
     upload_date = db.Column(db.DateTime, nullable=False, default=datetime.now)
-    folder_id = db.Column(db.Integer, db.ForeignKey('folder.id'))
+    # folder_id = db.Column(db.Integer, db.ForeignKey('folder.id'))
 
-    folder = db.relationship('Folder', backref=db.backref('files', lazy=True))
+    # folder = db.relationship('Folder', backref=db.backref('files', lazy=True))
     def __repr__(self):
         return f"File('{self.filename}', '{self.upload_date}')"
 
@@ -44,7 +44,7 @@ class Folder(db.Model):
 def index():
     files = get_files()
     folders = Folder.query.all()
-    return render_template('index.html', files=files,folders=folders)
+    return render_template('index.html', files=files)
 
 import os
 
