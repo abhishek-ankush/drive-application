@@ -4,11 +4,19 @@ import glob
 from flask_bootstrap import Bootstrap
 # from docx2pdf import convert
 from datetime import datetime
+from flask_login import LoginManager, UserMixin, login_user, logout_user, current_user, login_required
+from werkzeug.security import generate_password_hash, check_password_hash
+import mysql.connector
+
+
+host = ''
+port =   # Default port for MySQL
+user = ''
+password = ''
+database = ''
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
-
-bootstrap = Bootstrap(app)
 UPLOAD_FOLDER = 'F:/file_upload_application/static/uploads'
 # ALLOWED_EXTENSIONS = {'txt', 'pdf', 'docx','jpg'}
 
@@ -20,6 +28,71 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 from flask_sqlalchemy import SQLAlchemy
 db = SQLAlchemy(app)
+
+bootstrap = Bootstrap(app)
+
+from flask_wtf import FlaskForm
+from wtforms import StringField, PasswordField, SubmitField
+from wtforms.validators import DataRequired
+
+from flask_wtf import FlaskForm
+
+
+class LoginForm(FlaskForm):
+    username = StringField('Username', validators=[DataRequired()])
+    password = PasswordField('Password', validators=[DataRequired()])
+    submit = SubmitField('Login')
+
+# class User(UserMixin, db.Model):
+#     id = db.Column(db.Integer, primary_key=True)
+#     username = db.Column(db.String(64), unique=True, nullable=False)
+#     password_hash = db.Column(db.String(128), nullable=False)
+
+#     def set_password(self, password):
+#         self.password_hash = generate_password_hash(password)
+
+#     def check_password(self, password):
+#         return check_password_hash(self.password_hash, password)
+
+
+login_manager = LoginManager(app)
+login_manager.login_view = 'login'
+
+
+
+# class User(db.Model, UserMixin):
+#     # your model fields and definitions here
+
+#     def __init__(self, username):
+#         self.username = username
+#         # additional initialization if needed
+#         self.id = None
+
+#     def is_active(self):
+#     # Define the logic to determine if the user is active
+#     # For example, you can return True if the user is active and False otherwise
+#         return True
+
+#     def get_id(self):
+#         # Return the unique identifier for the user (e.g., user ID as a string)
+#         return str(self.id)
+
+USERS = {
+    'admin': {
+        'username': 'admin',
+        'password': 'password',
+    }
+}
+
+@login_manager.user_loader
+def load_user(user_id):
+    user = USERS.get(user_id)
+    if user:
+        return User(user['username'])
+    return None
+
+
+
 
 
 
@@ -38,13 +111,90 @@ class Folder(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100))
 
-
-
-@app.route('/')
+@app.route('/index')
+@login_required
 def index():
     files = get_files()
     folders = Folder.query.all()
     return render_template('index.html', files=files)
+
+# @login_manager.user_loader
+# def load_user(user_id):
+#     if user_id is None:
+#         return None
+#     return User.query.get(user_id)
+
+from flask_login import login_user
+
+from flask import redirect, url_for, render_template, request,flash
+from flask_login import login_user, current_user
+
+# Define a dictionary to store user information
+from flask_login import login_user
+
+
+# from forms import LoginForm 
+
+# ...
+
+
+
+from flask_login import login_user
+
+from flask_login import UserMixin
+
+from flask_login import UserMixin
+
+class User(UserMixin):
+    def __init__(self, username):
+        self.username = username
+
+    def get_id(self):
+        return self.username
+
+# ...
+@login_manager.unauthorized_handler
+def unauthorized_callback():
+    flash('You must be logged in to access this page.', 'error')
+    return redirect(url_for('login'))
+
+
+
+@app.route('/', methods=['GET', 'POST'])
+def login():
+    form = LoginForm()
+    if request.method == 'POST':
+            
+        if current_user.is_authenticated:
+            return redirect(url_for('index'))
+
+        
+
+        if form.validate_on_submit():
+            username = form.username.data
+            password = form.password.data
+
+            user = USERS.get(username)
+
+            if user and user['password'] == password:
+                login_user(User(username))
+                return redirect(url_for('index'))
+            else:
+                flash('Invalid username or password', 'error')
+    else:
+        print(form.errors)  # Print the form validation errors
+        return render_template('login.html', form=form)
+
+
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('index'))
+
+
+
 
 import os
 
@@ -67,47 +217,68 @@ def generate_unique_filename(filename):
     return new_filename
 
 @app.route('/upload', methods=['GET', 'POST'])
+@login_required
 def upload():
     try:
         if request.method == 'POST':
             files = request.files.getlist('files')  # Retrieve the list of uploaded files
-
+            print(files)
             if not files:
                 flash('No files selected', 'error')
                 return redirect(request.url)
 
+            db_connection = mysql.connector.connect(
+                host=host,
+                port=port,
+                user=user,
+                password=password,
+                database=database
+            )
+            cursor = db_connection.cursor()
             for file in files:
                 if file.filename == '':
                     flash('No selected file', 'error')
                     return redirect(request.url)
 
+                query = "SELECT * FROM file WHERE filename = %s"
+                cursor.execute(query, (file.filename,))
+                existing_file = cursor.fetchone()
+                print(existing_file)
+                print(file.filename)
                 # Check if the file already exists
                 if file_exists(file.filename):
+                    print(file.filename)
                     flash('File already exists. Please rename the file or choose a different file.', 'error')
                     return redirect(request.url)
 
                 # Check if the file is allowed
                 if not allowed_file(file.filename):
+                    print(file.filename)
                     flash('Invalid file extension. Supported formats are: {}'.format(', '.join(SUPPORTED_EXTENSIONS)), 'error')
                     return redirect(request.url)
 
                 # Generate a new filename
-                filename = secure_filename(file.filename)
-                new_filename = generate_unique_filename(filename)
+                filename = file.filename
+                print(filename)
+                # new_filename = generate_unique_filename(filename)
 
                 # Save the file to the upload folder with the new filename
-                file.save(os.path.join(app.config['UPLOAD_FOLDER'], new_filename))
-                new_file = File(filename=new_filename)
-                db.session.add(new_file)
-
-            db.session.commit()
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                query = "INSERT INTO file_test(filename, upload_date) VALUES (%s, %s)"
+                cursor.execute(query, (filename, datetime.now()))
+                print('executed')
+                db_connection.commit()
+            cursor.close()
+            db_connection.close()
 
             flash('Files uploaded successfully!', 'success')
             return redirect(url_for('index'))
 
         return render_template('upload.html')
     except Exception as e:
-        print(e)
+        print("An error occurred while uploading files:", e)
+        flash('An error occurred while uploading files. Please try again.', 'error')
+        return redirect(url_for('upload'))
 
     return render_template('upload.html')
 
@@ -149,6 +320,7 @@ import time
 import os
 
 @app.route('/upload_folder', methods=['GET', 'POST'])
+@login_required
 def upload_folder():
     if request.method == 'POST':
         folder = request.files['folder']
@@ -266,6 +438,7 @@ import json
 from flask import request, jsonify
 
 @app.route('/search', methods=['POST'])
+@login_required
 def search():
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest': 
         search_option = request.form.get('search_option')
@@ -309,6 +482,7 @@ def search():
 
 
 @app.route('/view/<filename>')
+@login_required
 def view(filename):
     file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     if os.path.exists(file_path):
@@ -319,6 +493,7 @@ def view(filename):
 
 
 @app.route('/download/<filename>', methods=['GET'])
+@login_required
 def download(filename):
     file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     if os.path.exists(file_path):
